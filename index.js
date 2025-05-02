@@ -2,14 +2,16 @@ const fs = require("fs");
 const csv = require("csv-parser");
 const { createObjectCsvWriter } = require("csv-writer");
 const axios = require("axios");
+const XLSX = require("xlsx");
 
 // Input and Output file paths
 const inputFilePath = "short_links.csv";
-const outputFilePath = "expanded_links.csv";
+const outputCsvPath = "expanded_links.csv";
+const outputXlsxPath = "expanded_links.xlsx";
 
 // Initialize CSV writer
 const csvWriter = createObjectCsvWriter({
-  path: outputFilePath,
+  path: outputCsvPath,
   header: [
     { id: "short_link", title: "Short Link" },
     { id: "long_link", title: "Long Link" },
@@ -20,46 +22,48 @@ const csvWriter = createObjectCsvWriter({
 async function expandUrl(shortUrl) {
   try {
     const response = await axios.get(shortUrl, { maxRedirects: 0 });
-    return response.request.res.responseUrl || shortUrl; // Return original if not redirected
+    return response.request.res.responseUrl || shortUrl;
   } catch (error) {
-    if (error.response) {
-      // Handle HTTP redirection (301 or 302)
-      if (error.response.status === 301 || error.response.status === 302) {
-        return error.response.headers.location; // Return the redirected URL
-      }
-    } else if (error.request) {
-      // If request was made but no response received (e.g., network issues)
-      console.error(`No response received for ${shortUrl}: ${error.message}`);
-    } else {
-      // Other types of errors (e.g., invalid URLs)
-      console.error(`Error processing ${shortUrl}: ${error.message} -> ${shortUrl}`);
+    if (
+      error.response &&
+      (error.response.status === 301 || error.response.status === 302)
+    ) {
+      return error.response.headers.location;
     }
-    return shortUrl; // Return the original short URL in case of failure
+    console.error(`Error with ${shortUrl}: ${error.message}`);
+    return shortUrl;
   }
 }
 
-// Read CSV and process each shortened link
+// Function to write XLSX file
+function writeXlsx(data) {
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Expanded Links");
+  XLSX.writeFile(workbook, outputXlsxPath);
+  console.log("Done writing expanded links to XLSX.");
+}
+
+// Process the CSV
 const processCsv = () => {
   const results = [];
-  const promises = []; // Array to hold promises
+  const promises = [];
 
   fs.createReadStream(inputFilePath)
     .pipe(csv())
     .on("data", (row) => {
-      const shortLink = row["Short Link"]; // Assuming your column is named 'Short Link'
+      const shortLink = row["Short Link"];
       const promise = expandUrl(shortLink).then((longLink) => {
         results.push({ short_link: shortLink, long_link: longLink });
       });
-      promises.push(promise); // Add promise to array
+      promises.push(promise);
     })
     .on("end", async () => {
-      // Wait for all promises to resolve before writing the CSV
       await Promise.all(promises);
-      csvWriter
-        .writeRecords(results)
-        .then(() => console.log("Done writing expanded links to CSV."));
+      await csvWriter.writeRecords(results);
+      console.log("Done writing expanded links to CSV.");
+      writeXlsx(results); // write to XLSX
     });
 };
 
-// Start processing the CSV file
 processCsv();
