@@ -7,22 +7,23 @@ const XLSX = require("xlsx");
 // Input and Output file paths
 const inputFilePath = "short_links.csv";
 const outputCsvPath = "expanded_links.csv";
-const outputXlsxPath = "expanded_links.xlsx";
+const outputXlsxPath = "Listing Infringement Link.xlsx";
 
 // Initialize CSV writer
 const csvWriter = createObjectCsvWriter({
   path: outputCsvPath,
   header: [
-    { id: "short_link", title: "Short Link" },
-    { id: "long_link", title: "Long Link" },
+    // { id: "short_link", title: "Short Link" },
+    { id: "long_link", title: "Listing Infringement Link" },
   ],
 });
 
 // Function to expand shortened URLs
 async function expandUrl(shortUrl) {
   try {
-    const response = await axios.get(shortUrl, { maxRedirects: 0 });
-    return response.request.res.responseUrl || shortUrl;
+    const response = await axios.get(shortUrl, { maxRedirects: 1 });
+    const expandedUrl = new URL(response.request.res.responseUrl) || shortUrl;
+    return "https://" + expandedUrl.host + expandedUrl.pathname + expandedUrl.search;
   } catch (error) {
     if (
       error.response &&
@@ -35,13 +36,19 @@ async function expandUrl(shortUrl) {
   }
 }
 
-// Function to write XLSX file
-function writeXlsx(data) {
-  const worksheet = XLSX.utils.json_to_sheet(data);
+// Function to write XLSX file with custom headers
+function writeXlsxWithCustomHeaders(data) {
+  // Create array of arrays with custom header
+  const worksheetData = [
+    ["Listing Infringement Link"], // Custom header row
+    ...data.map(row => [row["Listing Infringement Link"]]) // Data rows
+  ];
+  
+  const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Expanded Links");
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
   XLSX.writeFile(workbook, outputXlsxPath);
-  console.log("Done writing expanded links to XLSX.");
+  console.log("Done writing expanded links to XLSX with custom headers.");
 }
 
 // Process the CSV
@@ -54,7 +61,7 @@ const processCsv = () => {
     .on("data", (row) => {
       const shortLink = row["Short Link"];
       const promise = expandUrl(shortLink).then((longLink) => {
-        results.push({ short_link: shortLink, long_link: longLink });
+        results.push({ long_link: longLink });
       });
       promises.push(promise);
     })
@@ -62,7 +69,10 @@ const processCsv = () => {
       await Promise.all(promises);
       await csvWriter.writeRecords(results);
       console.log("Done writing expanded links to CSV.");
-      writeXlsx(results); // write to XLSX
+      const longLinks = results.map((entry) => ({
+        "Listing Infringement Link": entry.long_link,
+      }));
+      writeXlsxWithCustomHeaders(longLinks); // write only long links to XLSX
     });
 };
 
