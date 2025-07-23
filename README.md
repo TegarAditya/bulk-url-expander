@@ -1,111 +1,105 @@
-To create a Node.js app that appends long links to a CSV file containing shortened links, you can use the `csv-parser` package to read the CSV, and the `axios` package to expand the shortened links by making HTTP requests. Here's a step-by-step guide.
+# 🔗 URL Expander – List Infingement
 
-### Step 1: Setup Node.js Environment
-1. Initialize your Node.js project:
-    ```bash
-    mkdir url_expander
-    cd url_expander
-    npm init -y
-    ```
-2. Install necessary packages:
-    ```bash
-    npm install csv-parser csv-writer axios
-    ```
+This Node.js script reads a CSV file containing **shortened URLs**, expands them to their **full destination URLs**, and exports the results into:
 
-### Step 2: Create the Application
+- A **CSV file** (`expanded_links.csv`)
+- An **Excel file** (`Listing Infringement Link.xlsx`)
 
-Create a file called `index.js` and add the following code:
+---
 
-```javascript
-const fs = require("fs");
-const csv = require("csv-parser");
-const { createObjectCsvWriter } = require("csv-writer");
-const axios = require("axios");
+## ✅ Features
 
-// Input and Output file paths
-const inputFilePath = "short_links.csv";
-const outputFilePath = "expanded_links.csv";
+- Reads short links from a CSV file (`short_links.csv`)
+- Expands each link using HTTP redirection
+- Outputs results with the header: `Listing Infringement Link`
+- Saves to both `.csv` and `.xlsx` formats
 
-// Initialize CSV writer
-const csvWriter = createObjectCsvWriter({
-  path: outputFilePath,
-  header: [
-    { id: "short_link", title: "Short Link" },
-    { id: "long_link", title: "Long Link" },
-  ],
-});
+---
 
-// Function to expand shortened URLs
-async function expandUrl(shortUrl) {
-  try {
-    const response = await axios.get(shortUrl, { maxRedirects: 0 });
-    return response.request.res.responseUrl || shortUrl; // Return original if not redirected
-  } catch (error) {
-    if (error.response) {
-      // Handle HTTP redirection (301 or 302)
-      if (error.response.status === 301 || error.response.status === 302) {
-        return error.response.headers.location; // Return the redirected URL
-      }
-    } else if (error.request) {
-      // If request was made but no response received (e.g., network issues)
-      console.error(`No response received for ${shortUrl}: ${error.message}`);
-    } else {
-      // Other types of errors (e.g., invalid URLs)
-      console.error(`Error processing ${shortUrl}: ${error.message} -> ${shortUrl}`);
-    }
-    return shortUrl; // Return the original short URL in case of failure
-  }
-}
+## 📦 Requirements
 
-// Read CSV and process each shortened link
-const processCsv = () => {
-  const results = [];
-  const promises = []; // Array to hold promises
+- Node.js v14 or newer
+- Internet connection
 
-  fs.createReadStream(inputFilePath)
-    .pipe(csv())
-    .on("data", (row) => {
-      const shortLink = row["Short Link"]; // Assuming your column is named 'Short Link'
-      const promise = expandUrl(shortLink).then((longLink) => {
-        results.push({ short_link: shortLink, long_link: longLink });
-      });
-      promises.push(promise); // Add promise to array
-    })
-    .on("end", async () => {
-      // Wait for all promises to resolve before writing the CSV
-      await Promise.all(promises);
-      csvWriter
-        .writeRecords(results)
-        .then(() => console.log("Done writing expanded links to CSV."));
-    });
-};
+---
 
-// Start processing the CSV file
-processCsv();
+## 🛠️ Installation
 
+1. Clone or download this repository.
+2. Install dependencies:
+
+   ```bash
+   npm install csv-parser csv-writer axios xlsx
+   ```
+
+---
+
+## 📄 Usage Instructions
+
+### 1. Prepare Your Input CSV
+
+Create a file named `short_links.csv` in the root directory with the following format:
+
+```csv
+Short Link
+https://bit.ly/example1
+https://tinyurl.com/example2
 ```
 
-### Step 3: Prepare CSV Files
-1. Create an input CSV file `short_links.csv` with the following structure:
-    ```csv
-    Short Link
-    https://bit.ly/xyz
-    https://tinyurl.com/abc
-    ```
+Make sure the column header is exactly: **Short Link**
 
-2. The output file `expanded_links.csv` will be automatically created by the app.
+---
 
-### Step 4: Run the Application
-In your terminal, run the app using:
+### 2. Run the Script
+
+Run the application using:
+
 ```bash
 node index.js
 ```
 
-This script reads each shortened link from `short_links.csv`, tries to resolve it to its full URL, and writes both the short and long links into `expanded_links.csv`.
+---
 
-### Explanation
-- **axios** is used to send HTTP requests to the shortened URLs to get the original long URLs.
-- **csv-parser** reads the input CSV file.
-- **csv-writer** writes the output to a new CSV file.
+## 📤 Output Files
 
-This setup should work for most shortened URLs, though there could be challenges if some services require custom headers or additional handling.
+After running the script, you will get:
+
+### ✅ `expanded_links.csv`
+
+```csv
+Listing Infringement Link
+https://example.com/original1
+https://anotherdomain.com/page
+```
+
+### ✅ `Listing Infringement Link.xlsx`
+
+- Excel version of the same content
+- One column: `Listing Infringement Link`
+
+---
+
+## ⚠️ Notes
+
+- If a short URL cannot be resolved, the script logs the error and keeps the original short URL.
+- The script follows up to **1 HTTP redirect**.
+- Some shortening services may block automated access or require special headers.
+
+---
+
+## 🔄 Reuse
+
+To run the script again:
+
+1. Update `short_links.csv` with new links.
+2. Run:
+
+   ```bash
+   node index.js
+   ```
+
+---
+
+## 🤝 License
+
+MIT – Free to use for personal or commercial projects.
