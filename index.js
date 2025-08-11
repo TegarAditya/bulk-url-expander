@@ -2,7 +2,7 @@ const fs = require("fs");
 const csv = require("csv-parser");
 const { createObjectCsvWriter } = require("csv-writer");
 const axios = require("axios");
-const XLSX = require("xlsx");
+const ExcelJS = require("exceljs");
 
 // Input and Output file paths
 const inputFilePath = "short_links.csv";
@@ -13,7 +13,6 @@ const outputXlsxPath = "Listing Infringement Link.xlsx";
 const csvWriter = createObjectCsvWriter({
   path: outputCsvPath,
   header: [
-    // { id: "short_link", title: "Short Link" },
     { id: "long_link", title: "Listing Infringement Link" },
   ],
 });
@@ -36,19 +35,33 @@ async function expandUrl(shortUrl) {
   }
 }
 
-// Function to write XLSX file with custom headers
-function writeXlsxWithCustomHeaders(data) {
-  // Create array of arrays with custom header
-  const worksheetData = [
-    ["Listing Infringement Link"], // Custom header row
-    ...data.map(row => [row["Listing Infringement Link"]]) // Data rows
+// Function to write XLSX file with custom headers using ExcelJS
+async function writeXlsxWithCustomHeaders(data) {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("Sheet1");
+
+  // Add header row with style
+  worksheet.columns = [
+    { header: "Listing Infringement Link", key: "link" },
   ];
-  
-  const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
-  XLSX.writeFile(workbook, outputXlsxPath);
-  console.log("Done writing expanded links to XLSX with custom headers.");
+
+  // Style header
+  worksheet.getRow(1).eachCell((cell) => {
+    cell.font = { bold: true, size: 11 };
+  });
+
+  // Add data rows with font size 11
+  data.forEach(row => {
+    const newRow = worksheet.addRow({ link: row["Listing Infringement Link"] });
+    newRow.eachCell((cell) => {
+      cell.font = { size: 11 };
+      cell.alignment = { vertical: "middle", horizontal: "left" };
+    });
+  });
+
+  // Save Excel file
+  await workbook.xlsx.writeFile(outputXlsxPath);
+  console.log("Done writing expanded links to XLSX with custom headers and styling.");
 }
 
 // Process the CSV
@@ -72,7 +85,7 @@ const processCsv = () => {
       const longLinks = results.map((entry) => ({
         "Listing Infringement Link": entry.long_link,
       }));
-      writeXlsxWithCustomHeaders(longLinks); // write only long links to XLSX
+      await writeXlsxWithCustomHeaders(longLinks);
     });
 };
 
